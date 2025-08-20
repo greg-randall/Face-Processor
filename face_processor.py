@@ -383,8 +383,8 @@ def run_cropping(args):
 
     # --- Configuration Loading ---
     targets = {
-        'eye_y': 0.45,
-        'face_height': 0.65, 
+        'eye_y': 0.39611051231622696,  # Default values based on the built-in median_landmarks.json
+        'face_height': 0.4479338452219963,  # Default values based on the built-in median_landmarks.json
         'x_center': 0.5
     }
     print("--- Setting Alignment Targets ---")
@@ -397,9 +397,15 @@ def run_cropping(args):
                 targets['x_center'] = data['median_eye_center']['x']
             print(f"✅ Loaded targets from '{args.config}'")
         else:
-            if args.config != "median_landmarks.json":
+            # If the default config file is not found, print a specific warning.
+            if args.config == "median_landmarks.json":
+                print(f"⚠️  Warning: Default config file '{args.config}' not found.")
+                print("ℹ️  Using built-in default targets instead.")
+            # If a user-specified config file is not found, print a different warning.
+            else:
                 print(f"⚠️  Warning: Specified config file not found: '{args.config}'")
-            print("ℹ️  Using built-in default targets.")
+                print("ℹ️  Using built-in default targets instead.")
+
     except Exception as e:
         print(f"⚠️  Warning: Could not read or parse '{args.config}'. Using defaults. Error: {e}")
 
