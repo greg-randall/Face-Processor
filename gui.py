@@ -17,6 +17,9 @@ class FaceProcessorApp:
         self.root.resizable(False, False)
         self.log_visible = False
 
+        # --- NEW --- Handle window closing correctly
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
         # Queues for communicating with the worker thread
         self.log_queue = queue.Queue()
         self.progress_queue = queue.Queue()
@@ -78,10 +81,9 @@ class FaceProcessorApp:
 
         # --- Output Log ---
         self.log_frame = tk.LabelFrame(main_frame, text="Log Output", padx=10, pady=10)
-        self.log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        # self.log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10)) # Keep it hidden initially
         self.log_text = scrolledtext.ScrolledText(self.log_frame, state='disabled', height=10, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
-        self.log_frame.pack_forget()
 
         # --- Action Buttons ---
         action_frame = tk.Frame(main_frame)
@@ -94,6 +96,10 @@ class FaceProcessorApp:
 
         # Start the queue processor
         self.process_queues()
+
+    def on_closing(self):
+        """Handle the window close event."""
+        self.root.destroy()
 
     def browse_file(self):
         """Opens a file dialog to select a single image file."""
@@ -141,20 +147,16 @@ class FaceProcessorApp:
 
     def start_processing(self):
         """Gathers options and starts the processing in a new thread."""
-        # Clear the queues before starting a new run
         for q in [self.log_queue, self.progress_queue]:
             while not q.empty():
-                try:
-                    q.get_nowait()
-                except queue.Empty:
-                    continue
+                try: q.get_nowait()
+                except queue.Empty: continue
         
         input_path = self.input_path_var.get()
         if not input_path:
             messagebox.showerror("Error", "Please select an input path.")
             return
 
-        # Get the list of files to process to set up the progress bar
         image_files = face_processor.get_image_paths(input_path)
         total_files = len(image_files)
 
@@ -170,103 +172,82 @@ class FaceProcessorApp:
         self.log_text.delete(1.0, tk.END)
         self.log_text.config(state='disabled')
 
-        # Define a callback for progress updates
         def progress_callback():
             self.progress_queue.put(1)
 
         options = {
-            'input_path': input_path,
-            'output': None,  # Let the script auto-determine output names
-            'debug': False, # GUI does not expose debug mode
-            'disable_progress_bar': True, # Disables tqdm in the processor script
-            'progress_callback': progress_callback
+            'input_path': input_path, 'output': None, 'debug': False, 
+            'disable_progress_bar': True, 'progress_callback': progress_callback
         }
 
         if self.mode_var.get() == 'crop':
             options.update({
-                'config': "median_landmarks.json", # Uses default
-                'size': int(self.size_var.get()),
-                'aspect_ratio': self.aspect_ratio_var.get(),
-                'eye_y': None,
-                'face_height': None,
+                'config': "median_landmarks.json", 'size': int(self.size_var.get()),
+                'aspect_ratio': self.aspect_ratio_var.get(), 'eye_y': None, 'face_height': None,
                 'content_fill': self.content_fill_var.get()
             })
             target_func = face_processor.run_cropping
-        else: # Analyze
-            # No specific options needed for analyze mode from GUI
+        else:
             target_func = face_processor.run_analysis
         
-        # Run the processing in a separate thread to not freeze the GUI
+        # --- MODIFIED --- Make the thread a daemon
         self.thread = threading.Thread(target=self.run_task_in_thread, args=(target_func, options))
+        self.thread.daemon = True
         self.thread.start()
 
     def run_task_in_thread(self, target_func, options):
         """The worker function that runs in a separate thread."""
-        # Redirect stdout to our queue
         sys.stdout = self
         sys.stderr = self
         try:
             target_func(options)
         except Exception as e:
-            self.write(f"\n--- A CRITICAL ERROR OCCURRED ---\n{e}\n")
+            import traceback
+            self.write(f"\n--- A CRITICAL ERROR OCCURRED ---\n{traceback.format_exc()}\n")
         finally:
-            # Restore stdout and signal completion
             sys.stdout = sys.__stdout__
             sys.stderr = sys.__stderr__
             self.log_queue.put("--- All tasks complete ---")
-            self.log_queue.put(None) # Sentinel value to signal end
+            self.log_queue.put(None)
 
-    # These two methods make our class act like a file for stdout redirection
     def write(self, text):
         self.log_queue.put(text)
+
     def flush(self):
         pass
 
     def process_queues(self):
         """Checks the log and progress queues for messages from the worker thread."""
-        # Process log messages
         try:
             while True:
                 message = self.log_queue.get_nowait()
-                if message is None: # Sentinel found, task is done
+                if message is None:
                     self.run_button.config(state="normal", text="Run")
-
-                    # Process any remaining progress updates to fill the bar
-                    try:
-                        while True:
+                    # Clear any remaining items in the progress queue
+                    while not self.progress_queue.empty():
+                        try:
                             self.progress_queue.get_nowait()
-                            self.progress_bar.step(1)
-                    except queue.Empty:
-                        pass # No more progress updates
-
-                    # Now that all updates are processed, set to full
-                    if self.progress_bar['maximum'] > 0:
-                        self.progress_bar['value'] = self.progress_bar['maximum']
-                    
-                    messagebox.showinfo("Success", "Processing has finished!")
-                    
-                    # Reset progress bar for the next run
+                        except queue.Empty:
+                            break
+                    # Reset progress bar to 0
                     self.progress_bar['value'] = 0
-                    self.root.update_idletasks()
-                    
-                    # Do not return, so the queue processing continues for subsequent runs
+                    messagebox.showinfo("Success", "Processing has finished!")
                 else:
                     self.log_message(message)
         except queue.Empty:
-            pass # No new log messages
+            pass
 
-        # Process progress updates
         try:
             while True:
                 self.progress_queue.get_nowait()
                 self.progress_bar.step(1)
         except queue.Empty:
-            pass # No new progress messages
+            pass
         
-        # Check again after 100ms
         self.root.after(100, self.process_queues)
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = FaceProcessorApp(root)
     root.mainloop()
+
