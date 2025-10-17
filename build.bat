@@ -18,6 +18,10 @@ REM Build using the existing spec file (which includes MediaPipe data files)
 python -m PyInstaller --noconfirm --clean gui.spec
 
 echo.
-echo Build complete! The new executable is in the 'dist' folder.
+echo Packaging release archive...
+python3 package_release.py
+
+echo.
+echo Build complete! Release archive created.
 echo.
 pause
