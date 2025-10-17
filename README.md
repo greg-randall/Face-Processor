@@ -1,116 +1,79 @@
 # Face Processor
 
-**Automatically crop, align, and pad headshots with precision using facial landmark detection.**
+**Turn any headshot into a perfectly aligned, professional portrait in seconds.**
 
-Face Processor standardizes headshot images by detecting facial landmarks and aligning them to a consistent position and scale. It can intelligently generate background imagery for photos that are too tightly cropped, making it perfect for creating uniform profile pictures and professional headshot galleries.
+## Why Face Processor?
 
-## 🚀 Windows Downloadable Release
+Ever struggled with inconsistent headshots for your team page, dating profile, or portfolio? Face Processor automatically detects faces and creates perfectly aligned, consistently sized portraits - even intelligently adding background to photos that are too tightly cropped. No more manual cropping or expensive photo editing.
 
-**Ready-to-use Windows executable available!** No Python installation required.
+## See It In Action
 
-Download the latest Windows release from the repository's Releases section, or build your own using the instructions below. The Windows executable includes all dependencies and provides the full GUI experience in a single portable application.
+![GUI Demo](/samples/gui.gif)
 
-**Key Features:**
+### Before and After
 
-  - **Consistent Sizing & Alignment**: Uses the full height of the face (chin to forehead) for robust scaling, with eye-line alignment for vertical positioning.
-  - **Content-Aware Fill**: Intelligently generates background for images that require padding, creating a seamless, natural look.
-  - **High-Quality Resizing**: Employs the Pillow-Lanczos resampling algorithm to produce sharp, high-quality final images with minimal artifacts.
-  - **Advanced Analysis**: Creates a comprehensive alignment profile from your reference images and generates visual aids (`_analysis.jpg`, `_debug.jpg`) for fine-tuning.
-  - **Batch Processing**: Run on entire directories of images at once.
-  - **Configurable**: Adjust aspect ratios, sizes, and alignment targets to fit any style.
-
------
-
-## Before and After
-
-Look in the 'samples' folder for more.
-
-| Original                                         | Cropped (Aligned & Padded)                               |
+| Original                                         | Processed (Auto-aligned & Padded)                        |
 | :----------------------------------------------- | :------------------------------------------------------- |
 | <img src="/samples/sample (2).jpg" width="300"> | <img src="/samples/sample (2)_cropped.jpg" width="300"> |
 | <img src="/samples/sample (5).jpg" width="300"> | <img src="/samples/sample (5)_cropped.jpg" width="300"> |
 | <img src="/samples/sample (1).jpg" width="300"> | <img src="/samples/sample (1)_cropped.jpg" width="300"> |
 
------
-
-## GUI Demo
-
-![GUI Demo](/samples/gui.gif)
-
-The Face Processor GUI provides an intuitive interface for batch processing images with real-time progress tracking and detailed configuration options.
+*Look in the 'samples' folder for more examples.*
 
 ## Quick Start
 
-### Installation
+### 🚀 Windows Users (No Installation!)
 
-#### Option 1: Windows Executable (Recommended for Windows users)
-1. Download the latest `FaceProcessor_Windows.zip` from the Releases section
-2. Extract the archive to your preferred location
-3. Run `FaceProcessor.exe` - no installation required!
+1. Download `FaceProcessor_Windows.zip` from [Releases](../../releases)
+2. Extract and run `FaceProcessor.exe`
+3. Select your images and click Process!
 
-#### Option 2: Python Installation
+### 🐍 Python Users
+
 ```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-**GUI Requirements:**
-The GUI uses tkinter which comes pre-installed with most Python distributions. If not available, install it separately depending on your system.
-
-### Basic Usage
-
-**GUI Usage (Recommended):**
-
-```
+# Launch the GUI
 python gui.py
 ```
 
-The GUI provides a user-friendly interface for both cropping and analysis modes with real-time progress tracking and detailed logging.
+That's it! Select your images in the GUI and watch the magic happen.
 
-**Command Line Usage:**
+### Command Line Power Users
 
-**Crop a single image:**
+```bash
+# Process a single image
+python face_processor.py photo.jpg
 
-```
-python face_processor.py path/to/your/headshot.jpg
-```
+# Process entire folder
+python face_processor.py ./headshots/
 
-**Process an entire directory:**
-
-```
-python face_processor.py path/to/image/directory/
-```
-
-**Create a custom alignment profile from reference photos:**
-
-```
-python face_processor.py --analyze path/to/reference/images/
+# Match the style of existing photos
+python face_processor.py --analyze ./reference-photos/
 ```
 
-This will find the average position and size of faces in your existing photos, then apply that same crop style to new photos.
+## Key Features
+
+✨ **Smart Face Detection** - Uses MediaPipe's advanced facial landmark detection  
+🎯 **Perfect Alignment** - Automatically aligns eyes and face position across all images  
+🖼️ **Content-Aware Fill** - Intelligently generates background for tight crops  
+📁 **Batch Processing** - Process entire folders with one click  
+🎨 **Customizable Output** - Adjust aspect ratios, sizes, and alignment targets  
+📊 **Style Matching** - Analyze existing photos to match their cropping style  
 
 -----
 
-## GUI Features
+# Full Documentation
 
-The graphical interface (`gui.py`) provides an intuitive way to process images with the following capabilities:
+## GUI Interface
 
-  - **Two Processing Modes**: Switch between "Crop Images" and "Analyze Folder" modes
-  - **Real-time Progress**: Visual progress bar showing current processing status
-  - **Live Logging**: Detailed output log with processing messages and status updates
-  - **File/Folder Selection**: Easy browse buttons for selecting input files or directories
-  - **Configurable Options**: Adjustable settings for image size, aspect ratio, and content-aware fill
-  - **Toggle Log Window**: Show/hide the log output pane to conserve screen space
-
-**GUI Controls:**
-
-- **Input Selection**: Use "Select File..." for single images or "Select Folder..." for batch processing
-- **Mode Selection**: Choose between cropping existing images or analyzing a folder to create alignment profiles
-- **Cropping Options**:
-  - Size (width): Set the output width in pixels (default: 600)
-  - Aspect Ratio: Specify the final image ratio (e.g., "1:1", "4:5", "16:9")
-  - Content-Aware Fill: Enable/disable intelligent background padding
-- **Progress Tracking**: Visual indicator shows processing progress for batch operations
-- **Log Output**: Detailed processing information including success messages and warnings
+The Face Processor GUI provides:
+- **Two Modes**: "Crop Images" for processing and "Analyze Folder" for style matching
+- **Real-time Progress**: Visual progress bar and live logging
+- **Easy Selection**: Browse buttons for files and folders
+- **Customization**: Adjust output size, aspect ratio, and content-aware fill
+- **Batch Processing**: Process entire directories with one click
 
 -----
 
