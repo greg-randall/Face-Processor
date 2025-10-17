@@ -12,6 +12,24 @@ from tqdm import tqdm
 
 # --- Utility Functions ---
 
+def get_image_paths(path):
+    """Gets a list of image paths from a file or directory."""
+    image_paths_to_process = []
+    supported_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp')
+    if os.path.isfile(path):
+        if path.lower().endswith(supported_extensions):
+            image_paths_to_process.append(path)
+    elif os.path.isdir(path):
+        all_files = glob.glob(os.path.join(path, '*'))
+        for f in all_files:
+            # Filter out already processed files or analysis markers
+            if f.lower().endswith(supported_extensions) and not f.lower().endswith(
+                ('_cropped.jpg', '_analysis.jpg', '_debug.jpg', 
+                 '_cropped.png', '_analysis.png', '_debug.png',
+                 '_cropped.webp', '_analysis.webp', '_debug.webp')):
+                image_paths_to_process.append(f)
+    return image_paths_to_process
+
 @contextmanager
 def suppress_stderr():
     """
@@ -63,7 +81,7 @@ def draw_analysis_markers(image, landmarks, output_path):
 
 # --- Core Logic for Analysis ---
 
-def find_median_landmarks(image_paths, face_mesh, debug=False, output_dir='', disable_progress_bar=False):
+def find_median_landmarks(image_paths, face_mesh, debug=False, output_dir='', disable_progress_bar=False, progress_callback=None):
     """
     Analyzes images to find median landmarks, saves annotated images,
     and returns data for averaging.
@@ -109,6 +127,9 @@ def find_median_landmarks(image_paths, face_mesh, debug=False, output_dir='', di
         else:
             if debug:
                 print(f"Warning: No face detected in {file_path}. Skipping.")
+
+        if progress_callback:
+            progress_callback()
 
     if not eye_centers or not face_heights:
         return None, []
@@ -275,12 +296,7 @@ def run_analysis(options):
         print(f"❌ Error: Input for analysis must be a directory. Path not found: '{image_directory}'")
         return
 
-    image_files = []
-    supported_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
-    for ext in supported_extensions:
-        image_files.extend(glob.glob(os.path.join(image_directory, ext)))
-
-    image_files = [f for f in image_files if not f.lower().endswith(('_analysis.jpg', '_debug.jpg', '_analysis.png', '_debug.png'))]
+    image_files = get_image_paths(image_directory)
 
     if not image_files:
         print(f"❌ Error: No supported images found in '{image_directory}'")
@@ -300,7 +316,8 @@ def run_analysis(options):
             face_mesh, 
             debug=options.get('debug', False), 
             output_dir=image_directory,
-            disable_progress_bar=options.get('disable_progress_bar', False)
+            disable_progress_bar=options.get('disable_progress_bar', False),
+            progress_callback=options.get('progress_callback')
         )
         face_mesh.close()
         return median_data, generated_files
@@ -347,6 +364,7 @@ def run_analysis(options):
 def run_cropping(options):
     """Runs the logic for the default cropping action."""
     did_inpaint_occur = False
+    progress_callback = options.get('progress_callback')
 
     targets = {'eye_y': 0.4, 'face_height': 0.45, 'x_center': 0.5}
     print("--- Setting Alignment Targets ---")
@@ -369,19 +387,7 @@ def run_cropping(options):
     if options.get('face_height') is not None:
         targets['face_height'] = options['face_height']
 
-    image_paths_to_process = []
-    input_path = options.get('input_path', '.')
-    if os.path.isfile(input_path):
-        image_paths_to_process.append(input_path)
-    elif os.path.isdir(input_path):
-        supported_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
-        all_files = glob.glob(os.path.join(input_path, '*'))
-        for f in all_files:
-            if f.lower().endswith(supported_extensions) and not f.lower().endswith(('_cropped.jpg', '_analysis.jpg', '_debug.jpg', '_cropped.png', '_analysis.png', '_debug.png')):
-                image_paths_to_process.append(f)
-    else:
-        print(f"❌ Error: Input path is not valid: {input_path}")
-        return
+    image_paths_to_process = get_image_paths(options.get('input_path', '.'))
 
     if not image_paths_to_process:
         print("\n🤷 No new images found to process.")
@@ -410,6 +416,8 @@ def run_cropping(options):
             )
             if inpainted:
                 did_inpaint_occur = True
+            if progress_callback:
+                progress_callback()
     # --- Process a Single File ---
     elif total_images == 1:
         image_path = image_paths_to_process[0]
@@ -423,6 +431,8 @@ def run_cropping(options):
         )
         if inpainted:
             did_inpaint_occur = True
+        if progress_callback:
+            progress_callback()
 
     if did_inpaint_occur:
         print("\n⚠️  Warning: Some images were padded using content-aware fill.")

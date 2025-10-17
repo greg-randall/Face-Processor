@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox, scrolledtext
 import face_processor  # Import our processing script
 import threading
 import queue
+from tkinter import ttk
 import sys
 import os
 
@@ -12,11 +13,13 @@ class FaceProcessorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Face Processor")
-        self.root.geometry("650x550")
+        self.root.geometry("650x350")
         self.root.resizable(False, False)
+        self.log_visible = False
 
-        # Queue for communicating with the worker thread
+        # Queues for communicating with the worker thread
         self.log_queue = queue.Queue()
+        self.progress_queue = queue.Queue()
 
         # --- Main Layout ---
         main_frame = tk.Frame(root, padx=15, pady=15)
@@ -27,10 +30,12 @@ class FaceProcessorApp:
         input_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.input_path_var = tk.StringVar()
-        self.input_entry = tk.Entry(input_frame, textvariable=self.input_path_var, width=60)
+        self.input_entry = tk.Entry(input_frame, textvariable=self.input_path_var, width=50)
         self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=2)
-        self.browse_button = tk.Button(input_frame, text="Browse...", command=self.browse_input)
-        self.browse_button.pack(side=tk.LEFT, padx=(5, 0))
+        self.browse_file_button = tk.Button(input_frame, text="Select File...", command=self.browse_file)
+        self.browse_file_button.pack(side=tk.LEFT, padx=(5, 0))
+        self.browse_folder_button = tk.Button(input_frame, text="Select Folder...", command=self.browse_folder)
+        self.browse_folder_button.pack(side=tk.LEFT, padx=(5, 0))
 
         # --- Mode & Options Section ---
         mode_options_frame = tk.Frame(main_frame)
@@ -65,31 +70,58 @@ class FaceProcessorApp:
         self.content_fill_check = tk.Checkbutton(self.options_frame, text="Use Content-Aware Fill", variable=self.content_fill_var)
         self.content_fill_check.grid(row=0, column=2, rowspan=2, sticky='w', padx=10)
         
+        # --- Progress Bar ---
+        progress_frame = tk.LabelFrame(main_frame, text="Progress", padx=10, pady=5)
+        progress_frame.pack(fill=tk.X, pady=(0, 10))
+        self.progress_bar = ttk.Progressbar(progress_frame, orient='horizontal', mode='determinate')
+        self.progress_bar.pack(fill=tk.X, ipady=4)
+
         # --- Output Log ---
-        log_frame = tk.LabelFrame(main_frame, text="Log Output", padx=10, pady=10)
-        log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        self.log_text = scrolledtext.ScrolledText(log_frame, state='disabled', height=10, wrap=tk.WORD)
+        self.log_frame = tk.LabelFrame(main_frame, text="Log Output", padx=10, pady=10)
+        self.log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.log_text = scrolledtext.ScrolledText(self.log_frame, state='disabled', height=10, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.log_frame.pack_forget()
 
         # --- Action Buttons ---
         action_frame = tk.Frame(main_frame)
         action_frame.pack(fill=tk.X)
+        self.toggle_log_button = tk.Button(action_frame, text="Show Log", command=self.toggle_log_visibility)
+        self.toggle_log_button.pack(side=tk.LEFT, ipadx=10)
+
         self.run_button = tk.Button(action_frame, text="Run", command=self.start_processing, bg="#4CAF50", fg="white", font=("Helvetica", 10, "bold"))
         self.run_button.pack(side=tk.RIGHT, ipadx=20, ipady=5)
 
         # Start the queue processor
-        self.process_log_queue()
+        self.process_queues()
 
-    def browse_input(self):
-        """Opens a file or directory dialog based on the selected mode."""
-        mode = self.mode_var.get()
-        if mode == "analyze":
-            path = filedialog.askdirectory(title="Select Folder to Analyze")
-        else: # Crop mode
-            path = filedialog.askdirectory(title="Select Folder with Images to Crop")
-        
+    def browse_file(self):
+        """Opens a file dialog to select a single image file."""
+        path = filedialog.askopenfilename(
+            title="Select an Image File",
+            filetypes=[("Image Files", "*.jpg *.jpeg *.png *.bmp *.webp"), ("All files", "*.*")]
+        )
         if path:
             self.input_path_var.set(path)
+
+    def browse_folder(self):
+        """Opens a directory dialog."""
+        path = filedialog.askdirectory(title="Select a Folder")
+        if path:
+            self.input_path_var.set(path)
+
+    def toggle_log_visibility(self):
+        """Shows or hides the log frame and resizes the window."""
+        if self.log_visible:
+            self.log_frame.pack_forget()
+            self.root.geometry("650x350")
+            self.toggle_log_button.config(text="Show Log")
+            self.log_visible = False
+        else:
+            self.log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+            self.root.geometry("650x550")
+            self.toggle_log_button.config(text="Hide Log")
+            self.log_visible = True
 
     def toggle_options(self):
         """Enables or disables cropping options based on the selected mode."""
@@ -109,21 +141,45 @@ class FaceProcessorApp:
 
     def start_processing(self):
         """Gathers options and starts the processing in a new thread."""
+        # Clear the queues before starting a new run
+        for q in [self.log_queue, self.progress_queue]:
+            while not q.empty():
+                try:
+                    q.get_nowait()
+                except queue.Empty:
+                    continue
+        
         input_path = self.input_path_var.get()
         if not input_path:
             messagebox.showerror("Error", "Please select an input path.")
             return
 
+        # Get the list of files to process to set up the progress bar
+        image_files = face_processor.get_image_paths(input_path)
+        total_files = len(image_files)
+
+        if total_files == 0:
+            messagebox.showinfo("Info", "No new images found to process.")
+            return
+
+        self.progress_bar['value'] = 0
+        self.progress_bar['maximum'] = total_files
+        
         self.run_button.config(state="disabled", text="Processing...")
         self.log_text.config(state='normal')
         self.log_text.delete(1.0, tk.END)
         self.log_text.config(state='disabled')
 
+        # Define a callback for progress updates
+        def progress_callback():
+            self.progress_queue.put(1)
+
         options = {
             'input_path': input_path,
             'output': None,  # Let the script auto-determine output names
             'debug': False, # GUI does not expose debug mode
-            'disable_progress_bar': True # Disables tqdm in the processor script
+            'disable_progress_bar': True, # Disables tqdm in the processor script
+            'progress_callback': progress_callback
         }
 
         if self.mode_var.get() == 'crop':
@@ -166,22 +222,49 @@ class FaceProcessorApp:
     def flush(self):
         pass
 
-    def process_log_queue(self):
-        """Checks the queue for messages from the worker thread and displays them."""
+    def process_queues(self):
+        """Checks the log and progress queues for messages from the worker thread."""
+        # Process log messages
         try:
             while True:
                 message = self.log_queue.get_nowait()
                 if message is None: # Sentinel found, task is done
                     self.run_button.config(state="normal", text="Run")
+
+                    # Process any remaining progress updates to fill the bar
+                    try:
+                        while True:
+                            self.progress_queue.get_nowait()
+                            self.progress_bar.step(1)
+                    except queue.Empty:
+                        pass # No more progress updates
+
+                    # Now that all updates are processed, set to full
+                    if self.progress_bar['maximum'] > 0:
+                        self.progress_bar['value'] = self.progress_bar['maximum']
+                    
                     messagebox.showinfo("Success", "Processing has finished!")
-                    return
+                    
+                    # Reset progress bar for the next run
+                    self.progress_bar['value'] = 0
+                    self.root.update_idletasks()
+                    
+                    # Do not return, so the queue processing continues for subsequent runs
                 else:
                     self.log_message(message)
         except queue.Empty:
-            pass # No new messages
+            pass # No new log messages
+
+        # Process progress updates
+        try:
+            while True:
+                self.progress_queue.get_nowait()
+                self.progress_bar.step(1)
+        except queue.Empty:
+            pass # No new progress messages
         
         # Check again after 100ms
-        self.root.after(100, self.process_log_queue)
+        self.root.after(100, self.process_queues)
 
 if __name__ == "__main__":
     root = tk.Tk()
