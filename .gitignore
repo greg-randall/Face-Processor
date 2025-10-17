@@ -1,5 +1,20 @@
+# User's original rules
 match/*
 *.jp*
 *.png
 *.heic
 __pycache__/*
+
+# PyInstaller build files
+/build/
+/dist/
+*.spec
+
+# Generated image outputs from face_processor.py
+*_cropped.*
+*_analysis.*
+*_debug.*
+analysis_average.jpg
+
+#skip virtual env
+/venv/*
