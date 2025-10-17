@@ -35,7 +35,20 @@ Look in the 'samples' folder for more.
 pip install opencv-python mediapipe numpy pillow tqdm
 ```
 
+**Optional for GUI:**
+The GUI uses tkinter which comes pre-installed with most Python distributions. If not available, install it separately depending on your system.
+
 ### Basic Usage
+
+**GUI Usage (Recommended):**
+
+```
+python gui.py
+```
+
+The GUI provides a user-friendly interface for both cropping and analysis modes with real-time progress tracking and detailed logging.
+
+**Command Line Usage:**
 
 **Crop a single image:**
 
@@ -59,6 +72,30 @@ This will find the average position and size of faces in your existing photos, t
 
 -----
 
+## GUI Features
+
+The graphical interface (`gui.py`) provides an intuitive way to process images with the following capabilities:
+
+  - **Two Processing Modes**: Switch between "Crop Images" and "Analyze Folder" modes
+  - **Real-time Progress**: Visual progress bar showing current processing status
+  - **Live Logging**: Detailed output log with processing messages and status updates
+  - **File/Folder Selection**: Easy browse buttons for selecting input files or directories
+  - **Configurable Options**: Adjustable settings for image size, aspect ratio, and content-aware fill
+  - **Toggle Log Window**: Show/hide the log output pane to conserve screen space
+
+**GUI Controls:**
+
+- **Input Selection**: Use "Select File..." for single images or "Select Folder..." for batch processing
+- **Mode Selection**: Choose between cropping existing images or analyzing a folder to create alignment profiles
+- **Cropping Options**:
+  - Size (width): Set the output width in pixels (default: 600)
+  - Aspect Ratio: Specify the final image ratio (e.g., "1:1", "4:5", "16:9")
+  - Content-Aware Fill: Enable/disable intelligent background padding
+- **Progress Tracking**: Visual indicator shows processing progress for batch operations
+- **Log Output**: Detailed processing information including success messages and warnings
+
+-----
+
 ## Command Line Arguments
 
 ### Universal Options
@@ -77,7 +114,7 @@ This will find the average position and size of faces in your existing photos, t
 | `--aspect-ratio`    | The aspect ratio of the final image (e.g., "1:1", "4:5").   | `"1:1"`                   |
 | `--eye-y`           | Manually set the target relative Y position for the eyes.   | From config               |
 | `--face-height`     | Manually set the target relative height for the face.       | From config               |
-| `--no-content-fill` | Disable the content-aware fill for background padding.      | `False`                   |
+| `--no-content-fill` | Disable the content-aware fill for background padding.      | `False` (enabled by default) |
 
 ### Analysis & Debug Options
 
@@ -121,7 +158,7 @@ The tool uses a landmark-driven approach for precision:
 
 ### Supported Formats
 
-  - **Input**: JPG, JPEG, PNG, BMP, TIFF
+  - **Input**: JPG, JPEG, PNG, BMP, TIFF, WebP
   - **Output**: Same format as input
   - **Transparency**: PNG files are flattened onto a background. If possible, the background color is detected from the image's metadata.
 
