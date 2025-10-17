@@ -44,7 +44,7 @@ Look in the 'samples' folder for more.
 
 #### Option 2: Python Installation
 ```bash
-pip install opencv-python mediapipe numpy pillow tqdm pyinstaller
+pip install -r requirements.txt
 ```
 
 **GUI Requirements:**
