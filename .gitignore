@@ -2,4 +2,4 @@ match/*
 *.jp*
 *.png
 *.heic
-
+__pycache__/*
