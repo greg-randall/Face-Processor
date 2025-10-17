@@ -10,6 +10,8 @@ __pycache__/*
 /dist/
 *.spec
 !gui.spec
+/FaceProcessor_Windows/
+release_windows*.zip
 
 # Generated image outputs from face_processor.py
 *_cropped.*
