@@ -6,16 +6,38 @@ import os
 import json
 import glob
 import sys
+import warnings
 from contextlib import contextmanager
 from PIL import Image
 from tqdm import tqdm
 
-# --- Utility Functions ---
+warnings.filterwarnings(
+    "ignore",
+    message=r"SymbolDatabase\.GetPrototype\(\) is deprecated",
+    category=UserWarning,
+    module=r"google\.protobuf\.symbol_database"
+)
 
+# --- NEW HELPER FUNCTION ---
+# This is the "map" for our packaged app. It helps it find its own files.
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Not running in a PyInstaller bundle, so just use the normal path
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# --- Utility Functions ---
 def get_image_paths(path):
     """Gets a list of image paths from a file or directory."""
     image_paths_to_process = []
     supported_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp')
+    if not path or not os.path.exists(path):
+        return []
     if os.path.isfile(path):
         if path.lower().endswith(supported_extensions):
             image_paths_to_process.append(path)
@@ -30,18 +52,22 @@ def get_image_paths(path):
                 image_paths_to_process.append(f)
     return image_paths_to_process
 
+
 @contextmanager
 def suppress_stderr():
     """
     A context manager to forcefully suppress stderr by redirecting its file descriptor.
     This is effective at silencing C-level library logs.
     """
-    original_tf_log_level = os.environ.get('TF_CPP_MIN_LOG_LEVEL', '')
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # Check if stderr has a fileno, which it won't in the GUI's redirected output
+    # --- THIS IS THE FIX ---
+    # If stderr has been redirected to an object without a fileno (like our GUI log),
+    # just yield and do nothing.
     if not hasattr(sys.stderr, 'fileno'):
         yield
         return
+
+    original_tf_log_level = os.environ.get('TF_CPP_MIN_LOG_LEVEL', '')
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     original_stderr_fd = sys.stderr.fileno()
     saved_stderr_fd = os.dup(original_stderr_fd)
     devnull_fd = os.open(os.devnull, os.O_RDWR)
@@ -81,7 +107,7 @@ def draw_analysis_markers(image, landmarks, output_path):
 
 # --- Core Logic for Analysis ---
 
-def find_median_landmarks(image_paths, face_mesh, debug=False, output_dir='', disable_progress_bar=False, progress_callback=None):
+def find_median_landmarks(image_paths, face_mesh, debug=False, output_dir='', disable_progress_bar=False):
     """
     Analyzes images to find median landmarks, saves annotated images,
     and returns data for averaging.
@@ -127,9 +153,6 @@ def find_median_landmarks(image_paths, face_mesh, debug=False, output_dir='', di
         else:
             if debug:
                 print(f"Warning: No face detected in {file_path}. Skipping.")
-
-        if progress_callback:
-            progress_callback()
 
     if not eye_centers or not face_heights:
         return None, []
@@ -296,7 +319,12 @@ def run_analysis(options):
         print(f"❌ Error: Input for analysis must be a directory. Path not found: '{image_directory}'")
         return
 
-    image_files = get_image_paths(image_directory)
+    image_files = []
+    supported_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
+    for ext in supported_extensions:
+        image_files.extend(glob.glob(os.path.join(image_directory, ext)))
+
+    image_files = [f for f in image_files if not f.lower().endswith(('_analysis.jpg', '_debug.jpg', '_analysis.png', '_debug.png'))]
 
     if not image_files:
         print(f"❌ Error: No supported images found in '{image_directory}'")
@@ -316,8 +344,7 @@ def run_analysis(options):
             face_mesh, 
             debug=options.get('debug', False), 
             output_dir=image_directory,
-            disable_progress_bar=options.get('disable_progress_bar', False),
-            progress_callback=options.get('progress_callback')
+            disable_progress_bar=options.get('disable_progress_bar', False)
         )
         face_mesh.close()
         return median_data, generated_files
@@ -369,16 +396,19 @@ def run_cropping(options):
     targets = {'eye_y': 0.4, 'face_height': 0.45, 'x_center': 0.5}
     print("--- Setting Alignment Targets ---")
     try:
-        config_path = options.get('config', 'median_landmarks.json')
+        # --- MODIFIED LINE ---
+        # Use our new helper function to find the config file
+        config_path = resource_path(options.get('config', 'median_landmarks.json'))
+
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 data = json.load(f)
                 targets['eye_y'] = data['median_eye_center']['y']
                 targets['face_height'] = data['median_face_height']
                 targets['x_center'] = data['median_eye_center']['x']
-            print(f"✅ Loaded targets from '{config_path}'")
+            print(f"✅ Loaded targets from '{os.path.basename(config_path)}'")
         else:
-            print(f"⚠️  Warning: Config file '{config_path}' not found. Using defaults.")
+            print(f"⚠️  Warning: Config file '{os.path.basename(config_path)}' not found. Using defaults.")
     except Exception as e:
         print(f"⚠️  Warning: Could not parse '{options.get('config')}'. Using defaults. Error: {e}")
 
@@ -398,36 +428,19 @@ def run_cropping(options):
         print(f"\nFound {total_images} images to process.\n")
 
     use_content_fill = options.get('content_fill', True)
-    disable_bar = options.get('disable_progress_bar', False)
     
-    # --- Process a Directory ---
-    if total_images > 1:
-        # For the GUI, we don't use the tqdm progress bar itself, but we iterate.
-        # The detailed printing is now inside crop_and_align_headshot.
-        loop_iterator = tqdm(image_paths_to_process, desc="Cropping Images", unit="image", disable=disable_bar)
-        for image_path in loop_iterator:
-            base, ext = os.path.splitext(image_path)
-            output_path = f"{base}_cropped{ext}"
-            inpainted = crop_and_align_headshot(
-                image_path, output_path, options.get('size', 600), options.get('aspect_ratio', '1:1'), 
-                targets, use_content_fill, 
-                quiet_success=False,  # Always print success for the GUI log
-                debug=options.get('debug', False)
-            )
-            if inpainted:
-                did_inpaint_occur = True
-            if progress_callback:
-                progress_callback()
-    # --- Process a Single File ---
-    elif total_images == 1:
-        image_path = image_paths_to_process[0]
+    # --- Process Images ---
+    for image_path in image_paths_to_process:
         output_path = options.get('output')
-        if output_path is None:
+        if output_path is None or total_images > 1:
             base, ext = os.path.splitext(image_path)
             output_path = f"{base}_cropped{ext}"
+        
         inpainted = crop_and_align_headshot(
             image_path, output_path, options.get('size', 600), options.get('aspect_ratio', '1:1'), 
-            targets, use_content_fill, quiet_success=False, debug=options.get('debug', False)
+            targets, use_content_fill, 
+            quiet_success=(total_images > 1),
+            debug=options.get('debug', False)
         )
         if inpainted:
             did_inpaint_occur = True
