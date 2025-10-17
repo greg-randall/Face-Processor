@@ -4,6 +4,12 @@
 
 Face Processor standardizes headshot images by detecting facial landmarks and aligning them to a consistent position and scale. It can intelligently generate background imagery for photos that are too tightly cropped, making it perfect for creating uniform profile pictures and professional headshot galleries.
 
+## 🚀 Windows Downloadable Release
+
+**Ready-to-use Windows executable available!** No Python installation required.
+
+Download the latest Windows release from the repository's Releases section, or build your own using the instructions below. The Windows executable includes all dependencies and provides the full GUI experience in a single portable application.
+
 **Key Features:**
 
   - **Consistent Sizing & Alignment**: Uses the full height of the face (chin to forehead) for robust scaling, with eye-line alignment for vertical positioning.
@@ -31,11 +37,17 @@ Look in the 'samples' folder for more.
 
 ### Installation
 
-```
-pip install opencv-python mediapipe numpy pillow tqdm
+#### Option 1: Windows Executable (Recommended for Windows users)
+1. Download the latest `FaceProcessor_Windows.zip` from the Releases section
+2. Extract the archive to your preferred location
+3. Run `FaceProcessor.exe` - no installation required!
+
+#### Option 2: Python Installation
+```bash
+pip install opencv-python mediapipe numpy pillow tqdm pyinstaller
 ```
 
-**Optional for GUI:**
+**GUI Requirements:**
 The GUI uses tkinter which comes pre-installed with most Python distributions. If not available, install it separately depending on your system.
 
 ### Basic Usage
@@ -190,3 +202,68 @@ Custom alignment profiles are JSON files containing target positions, like this:
         "y": 0.7121
     }
 }
+```
+
+-----
+
+## Building from Source
+
+### Windows Development Build
+
+For developers who want to build the Windows executable themselves:
+
+```bash
+# Clone or download the repository
+git clone <repository-url>
+cd Face-Processor
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Build the executable (Windows only)
+build.bat
+```
+
+The `build.bat` script will:
+1. Clean any previous build artifacts
+2. Create a new PyInstaller executable using `gui.spec`
+3. Package the release into a timestamped ZIP archive
+4. Clean up temporary build files
+
+### Manual Build
+
+If you prefer manual control over the build process:
+
+```bash
+# Build the executable
+python -m PyInstaller --noconfirm --clean gui.spec
+
+# Package the release
+python package_release.py
+```
+
+### Build Requirements
+
+- **Python 3.10+** with all dependencies from `requirements.txt`
+- **Windows OS** (for executable creation)
+- **PyInstaller** (included in requirements.txt)
+
+The build process creates a self-contained executable that includes:
+- MediaPipe face detection models
+- All Python dependencies
+- The complete GUI interface
+- Default configuration files
+
+The resulting `FaceProcessor_Windows_*.zip` archive contains a portable `FaceProcessor.exe` that can be distributed to Windows users without any Python installation required.
+
+-----
+
+## Technical Updates
+
+### What's New in Recent Versions
+
+- **PyInstaller Integration**: Full support for creating standalone Windows executables
+- **MediaPipe Bundle Optimization**: Essential MediaPipe assets are now included in the executable bundle
+- **Improved Resource Handling**: Robust path resolution for both development and deployed environments
+- **Automated Release Packaging**: Script-based creation of timestamped release archives
+- **Enhanced Build Process**: Clean build workflow with proper cleanup and temp file management
