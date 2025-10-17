@@ -33,6 +33,12 @@ Look in the 'samples' folder for more.
 
 -----
 
+## GUI Demo
+
+![GUI Demo](/samples/gui.gif)
+
+The Face Processor GUI provides an intuitive interface for batch processing images with real-time progress tracking and detailed configuration options.
+
 ## Quick Start
 
 ### Installation

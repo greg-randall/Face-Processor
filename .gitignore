@@ -21,3 +21,6 @@ analysis_average.jpg
 
 #skip virtual env
 /venv/*
+
+#skip releases
+*.zip
